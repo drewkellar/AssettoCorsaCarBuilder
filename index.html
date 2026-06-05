@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Assetto Corsa Data Editor</title>
+    <link rel="stylesheet" href="styles.css?v=20260605-diagnostics-drawer">
+  </head>
+  <body>
+    <header class="app-header">
+      <div>
+        <p class="eyebrow">Assetto Corsa</p>
+        <h1>Guided Car Data Editor</h1>
+      </div>
+      <div class="header-actions">
+        <button id="helpBtn" class="ghost">Instructions</button>
+        <button id="diagnosticsStatusBtn" class="diagnostics-status ok" type="button" hidden>Ready</button>
+        <label class="button">
+          Import Data Folder
+          <input id="dataFolderInput" type="file" webkitdirectory multiple hidden>
+        </label>
+        <label class="button">
+          Import Zip
+          <input id="zipInput" type="file" accept=".zip,application/zip" hidden>
+        </label>
+        <button id="exportBtn" disabled>Download Data Zip</button>
+      </div>
+    </header>
+
+    <main>
+      <section id="emptyState" class="empty-state">
+        <div>
+          <h2>Load an unpacked car data folder to begin.</h2>
+          <p>Import an unpacked Assetto Corsa data folder, or upload a zip/folder that contains one. If data is still packed, use Content Manager to unpack it first.</p>
+        </div>
+      </section>
+
+      <section id="editorShell" class="editor-shell" hidden>
+        <aside class="side-panel">
+          <div class="car-card">
+            <span class="status-dot"></span>
+            <div>
+              <p class="label">Loaded Build</p>
+              <h2 id="carName">Unknown car</h2>
+            </div>
+          </div>
+          <dl class="stats">
+            <div><dt>Files</dt><dd id="fileCount">0</dd></div>
+            <div><dt>Edited</dt><dd id="editedCount">0</dd></div>
+            <div><dt>Warnings</dt><dd id="warningCount">0</dd></div>
+          </dl>
+          <nav id="tabs" class="tabs" aria-label="Editor sections"></nav>
+          <section class="changes-panel">
+            <h3>Changes</h3>
+            <ul id="changesList"></ul>
+          </section>
+          <section class="compare-panel">
+            <h3>Compare</h3>
+            <ul id="compareList"></ul>
+          </section>
+        </aside>
+
+        <section id="blockedShell" class="workbench blocked-shell" hidden>
+          <div class="toolbar">
+            <div>
+              <p class="label">Package Diagnostics</p>
+              <h2>Data Folder Required</h2>
+            </div>
+          </div>
+          <div class="blocked-content">
+            <h3>This car is not editable yet.</h3>
+            <p id="blockedMessage">Import a car with a loose data folder, or unpack data with Content Manager.</p>
+            <button id="blockedHelpBtn" class="ghost" type="button">Instructions</button>
+          </div>
+        </section>
+
+        <section id="workbench" class="workbench">
+          <div class="toolbar">
+            <div>
+              <p class="label">Guided Controls</p>
+              <h2 id="activeSectionTitle">Basics</h2>
+            </div>
+            <button id="resetBtn" class="ghost">Reset Values to Default</button>
+          </div>
+          <form id="controls" class="control-groups"></form>
+          <section id="curveEditor" class="curve-editor" hidden>
+            <div class="curve-header">
+              <div>
+                <p class="label">Power Curve</p>
+                <h2>Dyno graph</h2>
+              </div>
+              <div class="dyno-tools">
+                <div class="segmented-control" aria-label="Dyno edit mode">
+                  <button id="editTorqueBtn" type="button" aria-pressed="true">Edit Torque</button>
+                  <button id="editPowerBtn" type="button" aria-pressed="false">Edit Power</button>
+                </div>
+                <span class="info-wrap dyno-info">
+                  <button id="dynoInfoBtn" class="info-button" type="button" aria-label="About torque and power editing">i</button>
+                  <span class="info-panel">Assetto Corsa stores the engine curve as torque by RPM in power.lut. Power is calculated from torque and RPM, so editing power here converts back to torque for export.</span>
+                </span>
+              </div>
+              <div class="curve-legend" aria-label="Graph legend">
+                <span><b class="legend-power"></b> Power</span>
+                <span><b class="legend-torque"></b> Torque</span>
+              </div>
+              <div class="graph-scale-control">
+                <label id="targetPeakLabel">Target peak torque <input id="targetPeakInput" type="number" min="0" step="1" placeholder="Peak"></label>
+                <label>Torque units <select id="torqueUnitSelect"><option value="nm">Nm</option><option value="lbft">lb-ft</option></select></label>
+                <label>Power units <select id="powerUnitSelect"><option value="hp">HP</option><option value="ps">PS</option><option value="kw">kW</option></select></label>
+                <label><input id="graphAutoScale" type="checkbox" checked> Auto scale</label>
+                <label>Y max <input id="graphYMaxInput" type="number" min="50" step="25" placeholder="Auto" disabled></label>
+              </div>
+            </div>
+            <div class="dyno-panel">
+              <svg id="powerGraphSvg" class="power-graph-svg" role="img" aria-label="Torque and horsepower graph fallback"></svg>
+              <canvas id="powerGraph" width="980" height="380" aria-label="Torque and horsepower graph"></canvas>
+              <div id="graphHint" class="graph-hint">Drag torque points to shape the curve.</div>
+            </div>
+            <h3>Torque values</h3>
+            <div id="curveRows" class="curve-rows"></div>
+          </section>
+        </section>
+      </section>
+    </main>
+
+    <div id="diagnosticsDrawerBackdrop" class="drawer-backdrop" hidden>
+      <aside class="diagnostics-drawer" role="dialog" aria-modal="true" aria-labelledby="diagnosticsDrawerTitle">
+        <div class="drawer-top">
+          <div>
+            <p class="label">Diagnostics</p>
+            <h2 id="diagnosticsDrawerTitle">Import & Validation</h2>
+          </div>
+          <button id="diagnosticsCloseBtn" class="icon-button" type="button" aria-label="Close diagnostics">x</button>
+        </div>
+        <section id="diagnosticsCard" class="diagnostics-card"></section>
+        <section class="warnings-panel">
+          <h3>Validation</h3>
+          <ul id="warningsList"></ul>
+        </section>
+        <div class="drawer-actions">
+          <button id="diagnosticsHelpBtn" class="ghost" type="button">Instructions</button>
+        </div>
+      </aside>
+    </div>
+
+    <div id="helpModal" class="modal-backdrop" hidden>
+      <section class="help-modal" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+        <div class="modal-top">
+          <div>
+            <p class="label">Guide</p>
+            <h2 id="helpTitle">Instructions</h2>
+          </div>
+          <button id="helpCloseBtn" class="icon-button" type="button" aria-label="Close help">x</button>
+        </div>
+        <div class="help-content">
+          <h3>Get The Data Folder</h3>
+          <ol>
+            <li><strong>Enable Dev Mode in Content Manager if you have not already.</strong> Open <span>About</span> at the top-right, then rapidly click the version number text, such as <span>Version: 0.8.2790...</span>. When Content Manager asks whether to enable Developer Mode, choose <span>Yes</span>.</li>
+            <li><strong>Open the car in Content Manager.</strong> Go to <span>Content</span> at the top-right, open the car list, and select the car you want to modify.</li>
+            <li><strong>Unpack the physics data.</strong> Click <span>Unpack data</span> at the bottom of the car page. Content Manager will generate a <span>data</span> folder inside that car's folder.</li>
+          </ol>
+          <h3>Use This Tool</h3>
+          <ol>
+            <li><strong>Import only the <span>data</span> folder when possible.</strong> This keeps the editor fast and avoids loading car models, skins, previews, and sounds.</li>
+            <li><strong>If you accidentally import the full car folder, that is okay.</strong> The tool scans paths, loads only <span>data/**</span>, <span>data.acd</span>, and small metadata, then ignores graphics and sound assets.</li>
+            <li><strong>Edit with the tabs.</strong> Use Basics for mass/fuel/steering, Engine for limiter/inertia/power curve, Drivetrain for gears/diff/clutch, Brakes for torque/bias, Suspension for geometry/springs/dampers, and Tyres for pressure/grip values.</li>
+            <li><strong>Use Diagnostics and Changes.</strong> Open the header status button to review preflight or validation warnings, and check Changes so you know what you are replacing.</li>
+            <li><strong>Download the data zip.</strong> Replace the car's loose <span>data</span> folder with the exported one only after backing up the original car.</li>
+          </ol>
+          <h3>Troubleshooting</h3>
+          <ol>
+            <li><strong>No editable data found:</strong> the car probably still has only <span>data.acd</span>. Use Content Manager's <span>Unpack data</span>, then import again.</li>
+            <li><strong>Changes do not appear in-game:</strong> Assetto Corsa may still be using <span>data.acd</span> instead of loose data. Confirm the car has a loose <span>data</span> folder and Content Manager is using it.</li>
+            <li><strong>Online server mismatch:</strong> edited physics usually fail checksum unless the server and all clients use the exact same files.</li>
+            <li><strong>Missing LUT warnings:</strong> referenced curve files are absent. Re-unpack the car or restore the missing files before exporting.</li>
+          </ol>
+          <div class="warning-callout">
+            <strong>Back up the car first.</strong>
+            Replacing the generated <span>data</span> folder or its files changes the car copy Assetto Corsa will use. Duplicate the car folder or save a backup before editing.
+          </div>
+          <p class="help-note">This editor is intentionally data-only. It does not edit models, skins, previews, sounds, or packed <span>data.acd</span> files.</p>
+        </div>
+      </section>
+    </div>
+
+    <div id="exportModal" class="modal-backdrop" hidden>
+      <section class="help-modal" role="dialog" aria-modal="true" aria-labelledby="exportTitle">
+        <div class="modal-top">
+          <div>
+            <p class="label">Export Review</p>
+            <h2 id="exportTitle">Download Data Zip</h2>
+          </div>
+          <button id="exportCloseBtn" class="icon-button" type="button" aria-label="Close export review">x</button>
+        </div>
+        <div class="help-content">
+          <div class="warning-callout">
+            <strong>Back up the car first.</strong>
+            This export replaces loose physics files. Edited cars usually fail online checksums unless everyone uses the same files.
+          </div>
+          <h3>Changed Items</h3>
+          <ul id="exportChangesList" class="review-list"></ul>
+          <h3>Warnings</h3>
+          <ul id="exportWarningsList" class="review-list"></ul>
+          <div class="modal-actions">
+            <button id="confirmExportBtn" type="button">Download Data Zip</button>
+            <button id="cancelExportBtn" class="ghost" type="button">Cancel</button>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <template id="controlTemplate">
+      <div class="control">
+        <span class="control-top">
+          <span class="control-label"></span>
+          <span class="control-path"></span>
+        </span>
+        <span class="control-body"></span>
+        <span class="control-help"></span>
+      </div>
+    </template>
+
+    <script src="app.js?v=20260605-fuel-sync"></script>
+  </body>
+</html>
